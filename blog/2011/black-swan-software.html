@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8"/>
+    <title>The Black Swans of Software Engineering</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <meta name="keywords" content="">
+    <meta name="generator" content="JBake">
+
+    <!-- Le styles -->
+    <link href="../../css/bootstrap.min.css" rel="stylesheet">
+    <link href="../../css/asciidoctor.css" rel="stylesheet">
+    <link href="../../css/base.css" rel="stylesheet">
+    <link href="../../css/prettify.css" rel="stylesheet">
+
+    <!-- HTML5 shim, for IE6-8 support of HTML5 elements -->
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+
+    <!-- Fav and touch icons -->
+    <!--<link rel="apple-touch-icon-precomposed" sizes="144x144" href="../assets/ico/apple-touch-icon-144-precomposed.png">
+    <link rel="apple-touch-icon-precomposed" sizes="114x114" href="../assets/ico/apple-touch-icon-114-precomposed.png">
+    <link rel="apple-touch-icon-precomposed" sizes="72x72" href="../assets/ico/apple-touch-icon-72-precomposed.png">
+    <link rel="apple-touch-icon-precomposed" href="../assets/ico/apple-touch-icon-57-precomposed.png">-->
+    <link rel="shortcut icon" href="../../favicon.ico">
+  </head>
+  <body onload="prettyPrint()">
+    <div id="wrap">
+	
+	<!-- Fixed navbar -->
+    <div class="navbar navbar-default navbar-fixed-top" role="navigation">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="../../"></a>
+        </div>
+        <div class="navbar-collapse collapse">
+          <ul class="nav navbar-nav">
+            <li><a href="../../index.html">Home</a></li>
+            <li><a href="../../about.html">About</a></li>
+            <li><a href="../../feed.xml">Subscribe</a></li>
+            <!--<li class="dropdown">
+              <a href="#" class="dropdown-toggle" data-toggle="dropdown">Dropdown <b class="caret"></b></a>
+              <ul class="dropdown-menu">
+                <li><a href="#">Action</a></li>
+                <li><a href="#">Another action</a></li>
+                <li><a href="#">Something else here</a></li>
+                <li class="divider"></li>
+                <li class="dropdown-header">Nav header</li>
+                <li><a href="#">Separated link</a></li>
+                <li><a href="#">One more separated link</a></li>
+              </ul>
+            </li>-->
+          </ul>
+        </div><!--/.nav-collapse -->
+      </div>
+    </div>
+    <div class="container">	
+	<div class="page-header">
+		<h1>The Black Swans of Software Engineering</h1>
+	</div>
+
+	<p><em>21 June 2011</em></p>
+
+	<p><div class="paragraph">
+<p>I happen to be rereading The Black Swan by Nassim Taleb and started to thinking about the black swans that I run into in the world of software. Software embodies the essence of the black swan which consists of the following:</p>
+</div>
+<div class="paragraph">
+<p>The event is a surprise (to the observer).
+The event has a major impact.
+After its first recording, the event is rationalized by hindsight, as if it could have been expected (e.g., the relevant data were available but not accounted for).</p>
+</div>
+<div class="paragraph">
+<p>Bugs are always a surprise to a developer. Only an evil developer would purposefully introduce bugs to software that was knowingly going to be shipped. Because of this software must proceed through rigorous testing prior to shipping to attempt to eliminate these surprises. Often prior to such cycles a manager asks the developer "Is this code complete?" to which a confident developer will eventually reply "Yes". Subsequently testing commences and to the developers surprise the next morning a list of bugs appear in his/her inbox or worse the testing reveals the application is completely untestable. Often the later is caused by some minor configuration that was missed when deploying the application in the testing environment. This satifies the second requirement of the surprise event having a major impact. In software a missing charactor can devastate an entire program. Compiles and unit testing frameworks eliminate some of these more obvious bugs but there are still the bugs that only emerge in the harshest conditions such as a heavy load or concurrent access. These are difficult to test and often hard to fix. Additionally because software is so scalable (you can just keep selling the some piece of code over and over with very little cost) a bug found after shipping needs to be fixed perhaps on millions of individual machines. Finally after the bug is revealed or fixed how many times has a developer quickly rationalized that this event obviously occurred because of someone else&#8217;s work or an unexpected use case. If they had known these things the software would have been coded correctly. In fact often fixing one bug introduces another (Fred Brooks estimates this at 50% on the higher end) so these after the fact explanations often do not hold weight.</p>
+</div>
+<div class="paragraph">
+<p>Software development is always striking a delicate balance between enhancing productivity and making systems understandable. AOP is one example of a programming technique that has significant power to append code to various parts of a system based on rules. This technique can provide productivity gains to an individual coder however it can also introduce black swans in your software. One of the top uses of AOP is to adding logging throughout the system. This is successful because logging does not in anyway modify the state of the system so appending code that just records what has happened is relatively harmless. But what if a clever program devises AOP rules that modify the state of the system. For example updating a required field to all objects of a certain type when called by a method that starts with "update". From on aspect the design is elegant and clean since the code is "doing something for free" for other developers. The problem is other developers may not understand these rules or even know that these things are happening. So if a developer goes to update that field within there method and upon exiting the method is has not changed they may not have the understanding of the system to be able to debug. Magic has happened which is a very uncomfortable feeling in the mind of a developer.</p>
+</div>
+<div class="paragraph">
+<p>A second example is Java is concurrency. Java&#8217;s memory model is implemented to optimize the speed at which concurrent events can happen on say a website like eBay. The problem is developers tend to assume that concurrency is handled for them so when 2 users bid on the same item at the same time the JVM knows what to do. And it does but for the sake of speed Java sometimes has multiple copies of an object in memory and unless you tell it to publish the result to all of those copies as is necessary for concurrent programs to work "weird things" start to happen. Another black swan.</p>
+</div>
+<div class="paragraph">
+<p>Finally there is the case of the JDK upgrade in which there is potential for the foundations of the language to change. Suddenly performance tricks implemented in the old version no longer work. Memory model changes may expose lurking race conditions that were always there but just never came up. And on the flip side certain bugs and performance issues may even vanish due to fixes to the underlying core code. All of these likely make software development equal if not more black swan prone that even financial markets. Some of these are unavoidable but others can be mitigated. Fred Brooks has so far been proven correct in that order of magnitude increases in software development productivity is hard to come by. Though he is really talking about the process of creating software and not exclusively the tools we use. I think we need to take inventory of the tools we use and ask our selves the question: "Where am I creating black swans in my code?"</p>
+</div></p>
+
+	<hr />
+	
+		</div>
+		<div id="push"></div>
+    </div>
+    
+    <div id="footer">
+      <div class="container">
+        <p class="muted credit">&copy; 2017 Bob Paulin</p>
+      </div>
+    </div>
+    
+    <!-- Le javascript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="../../js/jquery-1.11.1.min.js"></script>
+    <script src="../../js/bootstrap.min.js"></script>
+    <script src="../../js/prettify.js"></script>
+    
+  </body>
+</html>
