@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8"/>
+    <title>Tutorial - Hazelcast on AWS Fargate</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <meta name="keywords" content="">
+    <meta name="generator" content="JBake">
+
+    <!-- Le styles -->
+    <link href="../../css/bootstrap.min.css" rel="stylesheet">
+    <link href="../../css/asciidoctor.css" rel="stylesheet">
+    <link href="../../css/base.css" rel="stylesheet">
+    <link href="../../css/prettify.css" rel="stylesheet">
+
+    <!-- HTML5 shim, for IE6-8 support of HTML5 elements -->
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+
+    <!-- Fav and touch icons -->
+    <!--<link rel="apple-touch-icon-precomposed" sizes="144x144" href="../assets/ico/apple-touch-icon-144-precomposed.png">
+    <link rel="apple-touch-icon-precomposed" sizes="114x114" href="../assets/ico/apple-touch-icon-114-precomposed.png">
+    <link rel="apple-touch-icon-precomposed" sizes="72x72" href="../assets/ico/apple-touch-icon-72-precomposed.png">
+    <link rel="apple-touch-icon-precomposed" href="../assets/ico/apple-touch-icon-57-precomposed.png">-->
+    <link rel="shortcut icon" href="../../favicon.ico">
+  </head>
+  <body onload="prettyPrint()">
+    <div id="wrap">
+   
+	
+	<!-- Fixed navbar -->
+    <div class="navbar navbar-default navbar-fixed-top" role="navigation">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="../../"></a>
+        </div>
+        <div class="navbar-collapse collapse">
+          <ul class="nav navbar-nav">
+            <li><a href="../../index.html">Home</a></li>
+            <li><a href="../../tags/blog.html">Blogs</a></li>
+            <!--<li><a href="../../tags/tutorial.html">Tutorials</a></li>-->
+            <li><a href="../../about.html">About</a></li>
+            <li><a href="../../feed.xml">Subscribe</a></li>
+            <!--<li class="dropdown">
+              <a href="#" class="dropdown-toggle" data-toggle="dropdown">Dropdown <b class="caret"></b></a>
+              <ul class="dropdown-menu">
+                <li><a href="#">Action</a></li>
+                <li><a href="#">Another action</a></li>
+                <li><a href="#">Something else here</a></li>
+                <li class="divider"></li>
+                <li class="dropdown-header">Nav header</li>
+                <li><a href="#">Separated link</a></li>
+                <li><a href="#">One more separated link</a></li>
+              </ul>
+            </li>-->
+          </ul>
+        </div><!--/.nav-collapse -->
+      </div>
+    </div>
+    <div class="container">	
+	<div class="page-header">
+		<h1>Tutorial - Hazelcast on AWS Fargate</h1>
+	</div>
+
+	<p><em>14 November 2019</em></p>
+	
+	<a href="https://twitter.com/share?ref_src=twsrc%5Etfw" class="twitter-share-button" data-show-count="false">Tweet</a><script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+
+	<p><div class="sect2">
+<h3 id="_hazelcast">Hazelcast</h3>
+<div class="paragraph">
+<p>For a couple of years now when it comes to deciding on a all purpose cache for Java I&#8217;ve reached for Hazelcast.  Each time I&#8217;ve done it I&#8217;ve aways been impressed by the wide array of cluster options available.  In fact I&#8217;ve never used the same discovery/clustering configuration twice.  While exploring new ways of doing things is exciting I think the main driver of discovering new discovery mechninanisms is the changing needs of clients wanting to take advantage of cloud offerings that fit how they want to manage there stacks.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_aws_ecs_fargate">AWS ECS Fargate</h3>
+<div class="paragraph">
+<p>Nearly all projects I&#8217;ve been on recently are working with containers and different ways of deploying them to the cloud.  It started with just putting docker on VMs but constant upgrading and devops overhead is leading many to start looking at more managed solutions.  While Kubernetes(K8) seems to be the most popular there are cases where K8 is overkill.  These projects involve maybe a dozen services maintained by a handfull of teams.  These teams have already gone through their battles with docker-compose and perhaps dabbled in swarm or rancher.  They look at services like Azure Kubernetes Service(AKS) or Amazon&#8217;s Elastic Kubernetes Services and they see good and bad.  Good that they can have an entirely managed docker environment that avoids most of the pain of system patching and scaling.  But the bad is they have to learn an entirely new tool with it&#8217;s own opinions, commands, and best practices.  Recently I&#8217;ve started exploring the middle ground between self hosted docker and Kubernetes and I&#8217;ve started to like AWS Elastic Container Service&#8217;s (ECS) Fargate option.  AWS ECS has been around for some time but until Fargate came around you still saw all the EC2 instances spun up in the background so while a number of things were managed for you at the end of the day it&#8217;s still docker on your VMs.   With Fargate the VMs no longer show up on your EC2 console.  They are completely managed by AWS.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_ecs_cli">ECS-CLI</h3>
+<div class="paragraph">
+<p>Another great benefit of ECS is it has a cli interface that have a number of useful features coming from a self hosted docker environment.  The first and by far most useful in my opinion is it&#8217;s integration with docker compose.  Many docker projects I&#8217;ve been on have adopted compose soon after figuring out the docker basics to better manage all the parameters that go into spinning up a stack of docker containers.  Moving to Kubernetes requires these to be converted while ECS is able to use the docker-compose.yml nearly as is.  Notable exceptions are secrets which can be managed via the ecs-params.yml file by tieing them to SSM Parameter Store values.  The ecs-params.yml also allows you to set the memory and cpu limits that will be used to size your containiner in Fargate.  This is important since rather than paying directly for the underlieing EC2 instances with Fargate billing is based on cpu and memory set when you start your container.  The ecs-params.yml also allow you to set networking and security parameters within AWS to determine what service your container will have permission to interact with, what ports will be open, and which vpc subnet you&#8217;ll be deployed into.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_dns_based_discovery_with_aws_cloud_map">DNS Based Discovery with AWS Cloud Map</h3>
+<div class="paragraph">
+<p>Finally the CLI allows you to set up service discovery in AWS Cloud Map.  Cloud Map allows ECS to manage AWS Route53 so that services looking to call your container can use simple DNS A or SRV records.  This will be important as we try to configure Hazelcast since instances will need to be able to locate each other without having to redeploy configuration in the containers.  A records and SRV records do this in different ways.  When you think about a regular website like <a href="https://bobpaulin.com" class="bare">https://bobpaulin.com</a> an A record is what connects bobpaulin.com to the ip address that serves the file content.  SRV records work a bit different but they allow more information to be passed to the caller such as the port to look on when looking up how to call the service.  When you start a service with ecs you can enable service discovery which add and removes DNS entries in Route53 as tasks are started and stopped within your cluster.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_hazelcast_kubernetes_plugin">Hazelcast Kubernetes Plugin</h3>
+<div class="paragraph">
+<p>The last piece of the puzzle to tie all these peices together is the Hazelcast Kubernetes plugin.  This plugin is included in the Hazelcast community docker image and contains two different method of doing discovery.  The first leverages the Kubernetes serivce API.  That api exists only in a K8 deployment so it won&#8217;t be of much use in a non K8 environment.  The second is based on DNS.  This implementation relies on DNS SRV records so it could be leveraged in any environment that creates SRV records.  This is what we&#8217;ll use in ECS since AWS Cloud Map can be setup to create service records.  This configuration will allow hazelcast instances to locate each other and form a cluster.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_setting_up_hazelcast_on_fargate">Setting up Hazelcast on Fargate</h3>
+<div class="paragraph">
+<p>Prerequisites:</p>
+</div>
+<div class="paragraph">
+<p>Docker installed
+AWS Account
+AWS CLI Installation
+ECS CLI Installation
+VPC with Internet Access</p>
+</div>
+<div class="paragraph">
+<p>1) Create ECR for hazelcast</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code class="language-bash" data-lang="bash">aws ecr create-repository --repository-name hazelcast-fargate</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>2) Create hazelcast.xml</p>
+</div>
+<div class="paragraph">
+<p>Note the &lt;interface&gt; element entry should match the subnet that the Fargate task will be running in.  For example a CIDR of 172.30.4.0/24 would have: &lt;interface&gt;172.30.4.*&lt;/interface&gt;</p>
+</div>
+<div class="paragraph">
+<p>The service-dns value will be determined by the service discovery service name and the private dns namespace name defined later.</p>
+</div>
+<div class="paragraph">
+<p>&lt;service-discovery-name&gt;.&lt;private-dns-namespace-name&gt;</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code class="language-xml" data-lang="xml">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;hazelcast xsi:schemaLocation="http://www.hazelcast.com/schema/config hazelcast-config-3.7.xsd"
+           xmlns="http://www.hazelcast.com/schema/config"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"&gt;
+
+    &lt;properties&gt;
+        &lt;property name="hazelcast.discovery.enabled"&gt;true&lt;/property&gt;
+    &lt;/properties&gt;
+
+    &lt;management-center enabled="false" update-interval="2"&gt;http://localhost:8080/mancenter&lt;/management-center&gt;
+
+   &lt;network&gt;
+        &lt;join&gt;
+          &lt;!-- deactivate multicast which is enabled by default --&gt;
+          &lt;multicast enabled="false"/&gt;
+          &lt;aws enabled="false"/&gt;
+          &lt;tcp-ip enabled="false" /&gt;
+          &lt;discovery-strategies&gt;
+            &lt;discovery-strategy enabled="true"
+                class="com.hazelcast.kubernetes.HazelcastKubernetesDiscoveryStrategy"&gt;
+              &lt;properties&gt;
+                 &lt;property name="service-dns"&gt;hazelcast-poc.hazelcast.bobpaulin.com&lt;/property&gt;
+              &lt;/properties&gt;
+            &lt;/discovery-strategy&gt;
+          &lt;/discovery-strategies&gt;
+        &lt;/join&gt;
+        &lt;interfaces enabled="true"&gt;
+          &lt;interface&gt;172.30.4.*&lt;/interface&gt;
+        &lt;/interfaces&gt;
+    &lt;/network&gt;
+&lt;/hazelcast&gt;</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>3) Create Dockerfile</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code class="language-Dockerfile" data-lang="Dockerfile">FROM hazelcast/hazelcast:3.11.4
+
+ADD hazelcast.xml $HZ_HOME</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>4) Build docker image</p>
+</div>
+<div class="paragraph">
+<p>Build image with custom hazelcast.xml
+The tag for the ECR should come from the repositoryUri output from the command</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code class="language-bash" data-lang="bash">aws ecr describe-repositories</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Next build and tag the image</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code class="language-bash" data-lang="bash">docker build -t hazelcast-fargate .
+docker tag hazelcast-fargate 11111111111.dkr.ecr.us-east-1.amazonaws.com/hazelcast-fargate:3.11.4</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>5) Deploy the docker image to ECR</p>
+</div>
+<div class="paragraph">
+<p>Login to ECR</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code class="language-bash" data-lang="bash">$(aws ecr get-login --no-include-email)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Push Container</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code class="language-bash" data-lang="bash">docker push 11111111111.dkr.ecr.us-east-1.amazonaws.com/hazelcast-fargate:3.11.4</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>6) Create Cloudwatch Log Group</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code class="language-bash" data-lang="bash">aws logs create-log-group --log-group-name /ecs/bobpaulin/hazelcast-aws</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>7) Create Task Execution Role</p>
+</div>
+<div class="paragraph">
+<p>task-execution-assume-role.json</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code class="language-json" data-lang="json">{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Run the following aws cli command to create the role</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code class="language-bash" data-lang="bash">aws iam --region us-east-1 create-role --role-name ecsTaskExecutionRole --assume-role-policy-document file://task-execution-assume-role.json</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Run the following aws cli command to attach the role policy</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code class="language-json" data-lang="json">aws iam --region us-east-1 attach-role-policy --role-name ecsTaskExecutionRole --policy-arn arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>8) Configuring the Security Group</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code class="language-bash" data-lang="bash">aws ec2 create-security-group --group-name EcsHazelcastSecurityGroup --description "Hazelcast ECS Security Group" --vpc vpc-abcdefg</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Add ingress port rules</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code class="language-bash" data-lang="bash">aws ec2 authorize-security-group-ingress --group-id sg-123456789 --protocol tcp --port 5701 --cidr 0.0.0.0/0</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>9) Creating a docker-compose.yml</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code class="language-yaml" data-lang="yaml">version: '3'
+services:
+  hazelcast-service:
+    image: 11111111111.dkr.ecr.us-east-1.amazonaws.com/hazelcast-fargate:3.11.4
+    ports:
+      - "5701:5701"
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: /ecs/bobpaulin/hazelcast-aws
+        awslogs-region: us-east-1
+        awslogs-stream-prefix: ecs
+    environment:
+      - MIN_HEAP_SIZE=4g
+      - MAX_HEAP_SIZE=4g
+      - AWS_DEFAULT_REGION=us-east-1</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>10) Creating a ecs-params.yml</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code class="language-yaml" data-lang="yaml">version: 1
+task_definition:
+  task_execution_role: ecsTaskExecutionRole
+  ecs_network_mode: awsvpc
+  task_size:
+    mem_limit: 6.0GB
+    cpu_limit: 2048
+run_params:
+  network_configuration:
+    awsvpc_configuration:
+      subnets:
+        - "subnet-abcdefg"
+      security_groups:
+        - "sg-123456789"
+  service_discovery:
+    private_dns_namespace:
+      vpc: "vpc-098765"
+      name: "hazelcast.bobpaulin.com"
+    service_discovery_service:
+      name: "hazelcast-poc"
+      dns-config:
+        type: SRV
+        ttl: 120</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>11) Configuring the ecs-cli to point to he cluster</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code class="language-bash" data-lang="bash">ecs-cli configure --cluster hazelcast --default-launch-type FARGATE --config-name default --region us-east-1</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Configure Profile</p>
+</div>
+<div class="paragraph">
+<p>Replace &lt;AWS_ACCESS_KEY_ID&gt; and &lt;AWS_SECRET_ACCESS_KEY&gt; with your AWS Access Key and Access Secret respectively.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code class="language-bash" data-lang="bash">ecs-cli configure profile --access-key &lt;AWS_ACCESS_KEY_ID&gt; --secret-key &lt;AWS_SECRET_ACCESS_KEY&gt; --profile-name default-profile</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>12) Running the ecs-cli to create the cluster</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code class="language-bash" data-lang="bash">ecs-cli up --cluster-config default --ecs-profile default-profile --security-group sg-123456789 --vpc vpc-098765 --subnets subnet-abcdefg</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Create ecs</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code class="language-bash" data-lang="bash">ecs-cli compose --project-name hazelcast-service service up --cluster hazelcast --enable-service-discovery --dns-type SRV --sd-container-name hazelcast-service --sd-container-port 5701</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Scale it up!</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code class="language-bash" data-lang="bash">ecs-cli compose --project-name hazelcast-service service scale 3</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Verify the cluster is formed from the logs</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code class="language-text" data-lang="text">2019-11-18 22:35:34
+INFO: [172.30.4.67]:5701 [dev] [3.11.4]
+2019-11-18 22:35:34
+Members {size:3, ver:3} [
+2019-11-18 22:35:34
+Member [172.30.4.67]:5701 - f8044a27-e20e-45bd-adba-fcac4e069cc1 this
+2019-11-18 22:35:34
+Member [172.30.4.241]:5701 - a69055e8-40d7-4cad-b5c1-8dcfd008f766
+2019-11-18 22:35:34
+Member [172.30.4.236]:5701 - 04ad412e-bc5b-4673-9226-12f8c60a1f06
+2019-11-18 22:35:34
+]</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>13) Turn it off!</p>
+</div>
+<div class="paragraph">
+<p>Remove the Service</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code class="language-bash" data-lang="bash">ecs-cli compose --project-name hazelcast-service service rm --cluster hazelcast</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Remove the Cluster</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="prettyprint highlight"><code class="language-bash" data-lang="bash">ecs-cli down --cluster-config default --ecs-profile default-profile</code></pre>
+</div>
+</div>
+</div></p>
+
+	<hr />
+	
+		</div>
+		<div id="push"></div>
+    </div>
+    
+    <div id="footer">
+      <div class="container">
+        <p class="muted credit">&copy; 2019 Bob Paulin</p>
+      </div>
+    </div>
+    
+    <!-- Le javascript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="../../js/jquery-1.11.1.min.js"></script>
+    <script src="../../js/bootstrap.min.js"></script>
+    <script src="../../js/prettify.js"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-115644602-1"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-115644602-1');
+    </script>
+  </body>
+</html>
