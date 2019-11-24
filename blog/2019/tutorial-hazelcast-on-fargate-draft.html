@@ -76,33 +76,39 @@
 	<a href="https://twitter.com/share?ref_src=twsrc%5Etfw" class="twitter-share-button" data-show-count="false">Tweet</a><script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
 
 	<p><div class="sect2">
+<h3 id="_overview">Overview</h3>
+<div class="paragraph">
+<p>The following tutorial covers setting up Hazelcast on AWS Fargate using the Hazelcast Kubernetes Plugin with DNS Service discovery.  If you are unfamiliar with any of these technologies I&#8217;ve provided some summaries below.  Those that are looking for justs the steps can skip the "Setting up Hazelcast on Fargate" section.  Enjoy!</p>
+</div>
+</div>
+<div class="sect2">
 <h3 id="_hazelcast">Hazelcast</h3>
 <div class="paragraph">
-<p>For a couple of years now when it comes to deciding on a all purpose cache for Java I&#8217;ve reached for Hazelcast.  Each time I&#8217;ve done it I&#8217;ve aways been impressed by the wide array of cluster options available.  In fact I&#8217;ve never used the same discovery/clustering configuration twice.  While exploring new ways of doing things is exciting I think the main driver of discovering new discovery mechninanisms is the changing needs of clients wanting to take advantage of cloud offerings that fit how they want to manage there stacks.</p>
+<p>For a couple of years now when it comes to deciding on a all purpose cache I&#8217;ve reached for Hazelcast.  Each time I&#8217;ve done it I&#8217;ve always been impressed by the wide array of clustering options available.  In fact I&#8217;ve never used the same discovery/clustering configuration twice.  While exploring new ways of doing things is exciting I think the main driver is the changing needs of clients wanting to take advantage of cloud offerings that fit how they want to manage there stacks.  Hazelcast is a swiss army knife type of cache, it provides several different data stuctures as well as many ways to configure loads and cache invalidations.</p>
 </div>
 </div>
 <div class="sect2">
 <h3 id="_aws_ecs_fargate">AWS ECS Fargate</h3>
 <div class="paragraph">
-<p>Nearly all projects I&#8217;ve been on recently are working with containers and different ways of deploying them to the cloud.  It started with just putting docker on VMs but constant upgrading and devops overhead is leading many to start looking at more managed solutions.  While Kubernetes(K8) seems to be the most popular there are cases where K8 is overkill.  These projects involve maybe a dozen services maintained by a handfull of teams.  These teams have already gone through their battles with docker-compose and perhaps dabbled in swarm or rancher.  They look at services like Azure Kubernetes Service(AKS) or Amazon&#8217;s Elastic Kubernetes Services and they see good and bad.  Good that they can have an entirely managed docker environment that avoids most of the pain of system patching and scaling.  But the bad is they have to learn an entirely new tool with it&#8217;s own opinions, commands, and best practices.  Recently I&#8217;ve started exploring the middle ground between self hosted docker and Kubernetes and I&#8217;ve started to like AWS Elastic Container Service&#8217;s (ECS) Fargate option.  AWS ECS has been around for some time but until Fargate came around you still saw all the EC2 instances spun up in the background so while a number of things were managed for you at the end of the day it&#8217;s still docker on your VMs.   With Fargate the VMs no longer show up on your EC2 console.  They are completely managed by AWS.</p>
+<p>Amazon Web Services (AWS) provides a service for running and scaling Docker containers called Elastic Container Service (ECS).  ECS comes in 2 flavors EC2 and Fargate.  In the EC2 flavor you run your containers on virtual machines that you spin up with AWS&#8217;s EC2 service but ECS takes care of orchestrating the Docker containers.  The other flavor Fargate also manages running, discovering and scaling the Docker operations but you never spin up any EC2 instances.  They are completely managed by AWS.  Nearly all projects I&#8217;ve been on recently are working with containers and different ways of deploying them to the cloud.  It started with just putting docker on VMs but constant upgrading and DevOps overhead is leading many to start looking at more managed solutions.  While Kubernetes(K8) seems to be the most popular there are cases where K8 is overkill.  These projects involve maybe a dozen services maintained by a handful of teams.  These teams have already gone through their battles with docker-compose and perhaps dabbled in Docker Swarm or Rancher.  They look at services like Azure Kubernetes Service(AKS) or Amazon&#8217;s Elastic Kubernetes Services and they see good and bad.  Good that they can have an entirely managed Docker environment that avoids most of the pain of system patching and scaling.  But the bad is they have to learn an entirely new tool with it&#8217;s own opinions, commands, and best practices.  AWS ECS has been around for some time and offers a nice middle ground between plain Docker and a fully orchestrated K8.</p>
 </div>
 </div>
 <div class="sect2">
 <h3 id="_ecs_cli">ECS-CLI</h3>
 <div class="paragraph">
-<p>Another great benefit of ECS is it has a cli interface that have a number of useful features coming from a self hosted docker environment.  The first and by far most useful in my opinion is it&#8217;s integration with docker compose.  Many docker projects I&#8217;ve been on have adopted compose soon after figuring out the docker basics to better manage all the parameters that go into spinning up a stack of docker containers.  Moving to Kubernetes requires these to be converted while ECS is able to use the docker-compose.yml nearly as is.  Notable exceptions are secrets which can be managed via the ecs-params.yml file by tieing them to SSM Parameter Store values.  The ecs-params.yml also allows you to set the memory and cpu limits that will be used to size your containiner in Fargate.  This is important since rather than paying directly for the underlieing EC2 instances with Fargate billing is based on cpu and memory set when you start your container.  The ecs-params.yml also allow you to set networking and security parameters within AWS to determine what service your container will have permission to interact with, what ports will be open, and which vpc subnet you&#8217;ll be deployed into.</p>
+<p>Another great benefit of ECS is it has a command line interface (CLI) that have a number of useful features coming from a self hosted docker environment.  The first and by far most useful in my opinion is it&#8217;s integration with docker compose.  Many docker projects I&#8217;ve been on have adopted compose soon after figuring out the docker basics to better manage all the parameters that go into spinning up a stack of docker containers.  Moving to Kubernetes requires these to be converted while ECS is able to use the docker-compose.yml nearly as-is.  Notable exceptions are secrets which can be managed via the ecs-params.yml file by associating them with SSM Parameter Store values.  The ecs-params.yml also allows you to set the memory and cpu limits that will be used to size your container in Fargate.  This is important since you don&#8217;t pay directly for the underling EC2 instances with Fargate.  Billing is based on CPU and memory set when you start your container.  The ecs-params.yml also allow you to set networking and security parameters within AWS to determine what service your container will have permission to interact with, what ports will be open, and which vpc subnet you&#8217;ll be deployed into.</p>
 </div>
 </div>
 <div class="sect2">
 <h3 id="_dns_based_discovery_with_aws_cloud_map">DNS Based Discovery with AWS Cloud Map</h3>
 <div class="paragraph">
-<p>Finally the CLI allows you to set up service discovery in AWS Cloud Map.  Cloud Map allows ECS to manage AWS Route53 so that services looking to call your container can use simple DNS A or SRV records.  This will be important as we try to configure Hazelcast since instances will need to be able to locate each other without having to redeploy configuration in the containers.  A records and SRV records do this in different ways.  When you think about a regular website like <a href="https://bobpaulin.com" class="bare">https://bobpaulin.com</a> an A record is what connects bobpaulin.com to the ip address that serves the file content.  SRV records work a bit different but they allow more information to be passed to the caller such as the port to look on when looking up how to call the service.  When you start a service with ecs you can enable service discovery which add and removes DNS entries in Route53 as tasks are started and stopped within your cluster.</p>
+<p>Finally the CLI allows you to set up service discovery in AWS Cloud Map.  Cloud Map allows ECS to manage AWS Route53 so that services looking to call your container can use simple DNS A or SRV records.  This will be important as we try to configure Hazelcast since instances will need to be able to locate each other without having to re-deploy configuration in the containers.  A records and SRV records do this in different ways.  When you think about a regular website like <a href="https://bobpaulin.com" class="bare">https://bobpaulin.com</a> an A record is what connects bobpaulin.com to the ip address that serves the file content.  SRV records work a bit different but they allow more information to be passed to the caller such as the port to look on when looking up how to call the service.  When you start a service with ecs you can enable service discovery which add and removes DNS entries in Route53 as tasks are started and stopped within your cluster.</p>
 </div>
 </div>
 <div class="sect2">
 <h3 id="_hazelcast_kubernetes_plugin">Hazelcast Kubernetes Plugin</h3>
 <div class="paragraph">
-<p>The last piece of the puzzle to tie all these peices together is the Hazelcast Kubernetes plugin.  This plugin is included in the Hazelcast community docker image and contains two different method of doing discovery.  The first leverages the Kubernetes serivce API.  That api exists only in a K8 deployment so it won&#8217;t be of much use in a non K8 environment.  The second is based on DNS.  This implementation relies on DNS SRV records so it could be leveraged in any environment that creates SRV records.  This is what we&#8217;ll use in ECS since AWS Cloud Map can be setup to create service records.  This configuration will allow hazelcast instances to locate each other and form a cluster.</p>
+<p>The last piece of the puzzle to tie all these pieces together is the Hazelcast Kubernetes plugin.  This plugin is included in the Hazelcast community docker image and contains two different method of doing discovery.  The first leverages the Kubernetes serivce API.  That api exists only in a K8 deployment so it won&#8217;t be of much use in a non K8 environment.  The second is based on DNS.  This implementation relies on DNS SRV records so it could be leveraged in any environment that creates SRV records.  This is what we&#8217;ll use in ECS since AWS Cloud Map can be setup to create service records.  This configuration will allow hazelcast instances to locate each other and form a cluster.</p>
 </div>
 </div>
 <div class="sect2">
@@ -115,7 +121,7 @@
 AWS Account
 AWS CLI Installation
 ECS CLI Installation
-VPC with Internet Access</p>
+AWS VPC with Internet Access</p>
 </div>
 <div class="paragraph">
 <p>1) Create ECR for hazelcast</p>
@@ -160,7 +166,7 @@ VPC with Internet Access</p>
             &lt;discovery-strategy enabled="true"
                 class="com.hazelcast.kubernetes.HazelcastKubernetesDiscoveryStrategy"&gt;
               &lt;properties&gt;
-                 &lt;property name="service-dns"&gt;hazelcast-poc.hazelcast.bobpaulin.com&lt;/property&gt;
+                 &lt;property name="service-dns"&gt;hazelcast.bobpaulin.com&lt;/property&gt;
               &lt;/properties&gt;
             &lt;/discovery-strategy&gt;
           &lt;/discovery-strategies&gt;
@@ -227,7 +233,7 @@ docker tag hazelcast-fargate 11111111111.dkr.ecr.us-east-1.amazonaws.com/hazelca
 </div>
 <div class="listingblock">
 <div class="content">
-<pre class="prettyprint highlight"><code class="language-bash" data-lang="bash">aws logs create-log-group --log-group-name /ecs/bobpaulin/hazelcast-aws</code></pre>
+<pre class="prettyprint highlight"><code class="language-bash" data-lang="bash">aws logs create-log-group --log-group-name /ecs/bobpaulin/hazelcast</code></pre>
 </div>
 </div>
 <div class="paragraph">
@@ -272,6 +278,9 @@ docker tag hazelcast-fargate 11111111111.dkr.ecr.us-east-1.amazonaws.com/hazelca
 <div class="paragraph">
 <p>8) Configuring the Security Group</p>
 </div>
+<div class="paragraph">
+<p>Replace vpc-abcdefg with the vpc you&#8217;re deploying into</p>
+</div>
 <div class="listingblock">
 <div class="content">
 <pre class="prettyprint highlight"><code class="language-bash" data-lang="bash">aws ec2 create-security-group --group-name EcsHazelcastSecurityGroup --description "Hazelcast ECS Security Group" --vpc vpc-abcdefg</code></pre>
@@ -280,6 +289,9 @@ docker tag hazelcast-fargate 11111111111.dkr.ecr.us-east-1.amazonaws.com/hazelca
 <div class="paragraph">
 <p>Add ingress port rules</p>
 </div>
+<div class="paragraph">
+<p>Replace sg-123456789 with the security group id create above</p>
+</div>
 <div class="listingblock">
 <div class="content">
 <pre class="prettyprint highlight"><code class="language-bash" data-lang="bash">aws ec2 authorize-security-group-ingress --group-id sg-123456789 --protocol tcp --port 5701 --cidr 0.0.0.0/0</code></pre>
@@ -287,6 +299,9 @@ docker tag hazelcast-fargate 11111111111.dkr.ecr.us-east-1.amazonaws.com/hazelca
 </div>
 <div class="paragraph">
 <p>9) Creating a docker-compose.yml</p>
+</div>
+<div class="paragraph">
+<p>Pull the image, awslogs-group, and region from the previous calls.</p>
 </div>
 <div class="listingblock">
 <div class="content">
@@ -299,7 +314,7 @@ services:
     logging:
       driver: awslogs
       options:
-        awslogs-group: /ecs/bobpaulin/hazelcast-aws
+        awslogs-group: /ecs/bobpaulin/hazelcast
         awslogs-region: us-east-1
         awslogs-stream-prefix: ecs
     environment:
@@ -310,6 +325,15 @@ services:
 </div>
 <div class="paragraph">
 <p>10) Creating a ecs-params.yml</p>
+</div>
+<div class="paragraph">
+<p>Replace subnet-abcdefg with your subnet</p>
+</div>
+<div class="paragraph">
+<p>Replace sg-123456789 with your security group</p>
+</div>
+<div class="paragraph">
+<p>Replace vpc-098765 with your vpc</p>
 </div>
 <div class="listingblock">
 <div class="content">
@@ -330,9 +354,9 @@ run_params:
   service_discovery:
     private_dns_namespace:
       vpc: "vpc-098765"
-      name: "hazelcast.bobpaulin.com"
+      name: "bobpaulin.com"
     service_discovery_service:
-      name: "hazelcast-poc"
+      name: "hazelcast"
       dns-config:
         type: SRV
         ttl: 120</code></pre>
@@ -359,6 +383,15 @@ run_params:
 </div>
 <div class="paragraph">
 <p>12) Running the ecs-cli to create the cluster</p>
+</div>
+<div class="paragraph">
+<p>Replace sg-123456789 with your security group</p>
+</div>
+<div class="paragraph">
+<p>Replace vpc-098765 with your vpc</p>
+</div>
+<div class="paragraph">
+<p>Replace subnet-abcdefg with your subnet</p>
 </div>
 <div class="listingblock">
 <div class="content">
@@ -417,6 +450,30 @@ Member [172.30.4.236]:5701 - 04ad412e-bc5b-4673-9226-12f8c60a1f06
 <div class="listingblock">
 <div class="content">
 <pre class="prettyprint highlight"><code class="language-bash" data-lang="bash">ecs-cli down --cluster-config default --ecs-profile default-profile</code></pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_links">Links</h4>
+<div class="paragraph">
+<p><a href="https://hazelcast.org/" class="bare">https://hazelcast.org/</a></p>
+</div>
+<div class="paragraph">
+<p><a href="https://aws.amazon.com/fargate/" class="bare">https://aws.amazon.com/fargate/</a></p>
+</div>
+<div class="paragraph">
+<p><a href="https://aws.amazon.com/cloud-map/" class="bare">https://aws.amazon.com/cloud-map/</a></p>
+</div>
+<div class="paragraph">
+<p><a href="https://en.wikipedia.org/wiki/SRV_record" class="bare">https://en.wikipedia.org/wiki/SRV_record</a></p>
+</div>
+<div class="paragraph">
+<p><a href="https://github.com/hazelcast/hazelcast-kubernetes" class="bare">https://github.com/hazelcast/hazelcast-kubernetes</a></p>
+</div>
+<div class="paragraph">
+<p><a href="https://docs.aws.amazon.com/cli/latest/userguide/install-cliv1.html" class="bare">https://docs.aws.amazon.com/cli/latest/userguide/install-cliv1.html</a></p>
+</div>
+<div class="paragraph">
+<p><a href="https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ECS_CLI_installation.html" class="bare">https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ECS_CLI_installation.html</a></p>
 </div>
 </div>
 </div></p>
